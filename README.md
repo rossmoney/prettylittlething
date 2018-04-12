@@ -8,32 +8,9 @@ php artisan products:import
 
 will output how many products were imported, and how many failed / couldn't be imported 
 
-## sql
+sql is inside products.sql in the route and also migrations are set up for the unit tests
 
---
--- Database: `prettylittlething`
---
+a copy of .env.example need to be made and database settings changed and 
+php artisan key:generate run in order to run unit tests
 
--- --------------------------------------------------------
-
---
--- Table structure for table `products`
---
-
-CREATE TABLE `products` (
-  `code` varchar(5) NOT NULL,
-  `name` varchar(50) NOT NULL,
-  `description` text NOT NULL,
-  `stock` int(11) NOT NULL,
-  `price` float NOT NULL,
-  `discontinued` set('yes','no') NOT NULL,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-
---
--- Indexes for table `products`
---
-ALTER TABLE `products`
-  ADD PRIMARY KEY (`code`);
-COMMIT;
+to run unit tests ./vendor/bin/phpunit
