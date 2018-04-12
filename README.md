@@ -4,6 +4,9 @@
 inside project directory
 
 composer install
+
+then 
+
 php artisan products:import
 
 will output how many products were imported, and how many failed / couldn't be imported 
