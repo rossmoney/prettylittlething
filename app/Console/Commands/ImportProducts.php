@@ -39,7 +39,7 @@ class ImportProducts extends Command
      */
     public function handle()
     {
-        $message = app('App\Helpers\Products')->importProducts();
+        $message = app('App\Http\Controllers\ProductsController')->importProducts('stock.csv');
         echo $message . "\r\n";
     }
 }

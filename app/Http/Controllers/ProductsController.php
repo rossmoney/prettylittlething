@@ -1,43 +1,88 @@
 <?php
 namespace App\Http\Controllers;
 
-use Input;
 use DB;
 use Illuminate\Http\Request;
-use App\Http\Requests\ListsRequest;
-use App\Lists;
-use App\Models\Product;
 use App\Http\Requests;
 use App\Http\Controllers\Controller;
 
-class Products extends Controller {
+use App\Helpers\CSV;
+use App\Models\Product;
 
-    public function index()
+class ProductsController extends Controller {
+
+    private $inserted = 0;
+    private $alreadyInserted = 0;
+    private $productArr = [];
+
+    public function importProducts($filename)
     {
-        // $list_items = Lists::all();
-        $products = Product::all();
+        $file = public_path($filename);
+        $csv = new CSV;
 
-        return view('products.list', compact('products'));
+        $productModel = new Product();
+        $csv->setHeaderRow($productModel->getMappings());
+
+        $this->productArr = $csv->toArray($file, $productModel); //custom field mappings and data types passed
+
+        if($this->productArr) {
+            $this->dedupeAndInsertProducts();
+
+            return $this->inserted . ' products were imported. ' . "\r\n" . 
+                   $this->alreadyInserted . " products were already imported.\r\n" .
+                   $csv->getInvalidProductCount() . " products were exported incorrectly and couldn't be imported.";
+        }
+
+        return 'CSV file /public/' . $filename . ' could not be found';
     }
 
-    public function store(Requests\ListsRequest $request)
-    {
-        $input = $request->input();
-        Lists::create($input);
+    public function setProductArray($productArr) {
+        $this->productArr = $productArr;
+        return $this->productArr;
+    }
 
-        if (Input::hasFile('name'))
+    public function dedupeAndInsertProducts() {
+        for ($i = 0; $i < count($this->productArr); $i ++)
         {
-
-            $file = Input::file('name');
-            $name = time() . '-' . $file->getClientOriginalName();
-
-            $path = storage_path('documents');
-
-            $file->move($path, $name);
-
-            // All works up to here
-            // All I need now is to create an array
-            // from the CSV and insert into the customers database
+            $exists = Product::query();
+            foreach($this->productArr[$i] as $key => $value) { //dedupe products, laravels built in updateOrCreate doesn't seem to work
+                $exists->where($key, 'LIKE', '%'. $value. '%');
+            }
+            if($exists->first() == null) {
+                Product::updateOrCreate($this->productArr[$i]);
+                $this->inserted++;
+            } else {
+                $this->alreadyInserted++;
+            }
         }
     }
+
+    public function processCSVRow($csv, $row) {
+        
+        $data = $csv->getRowData();
+        $invalids = $csv->getInvalidProductCount();
+        $discard = false;
+        $header = $csv->getHeaderRow();
+
+        $diff = count($header) - count($row);
+        $amount = abs($diff);
+        if($diff < 0) {
+            $row = array_slice($row, 0, count($header));
+        } else {
+            $row = array_pad($row, count($header), null);
+        }
+        $row = preg_replace('/\$|£/', '', $row); //format and sanitize data
+        foreach($row as $key=>$value) {
+            if($row[$key] == 'error in export') $discard = true;
+            $row[$key] = typeFormat($row, $this->types, $key); //defined in App\helpers.php
+        }
+        if($discard) {
+            $invalids++;
+            $csv->setInvalidProductCount($invalids);
+            return $data;
+        }
+        $data[] = array_combine($header, $row);
+        return $data;
+    }
+    
 }
